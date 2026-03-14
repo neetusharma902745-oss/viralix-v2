@@ -1,0 +1,217 @@
+Viralix
+ 
+Kuch bhi khojo...
+Feed Articles Video News Shop Wiki Messages 🔍 Search
+ A
+Home Articles Likho Videos Khabar 7 Shopping Wikipedia Messages 3 Google Search Notifications 4 Profile
+Ads
+Sponsored
+📱
+OnePlus 13 Pro
+Starting ₹59,999
+Buy Now
+Ad
+🎓
+Coursera Free Trial
+1000+ courses!
+Try Free
+{# ══════════════════ FEED ══════════════════ #} {% if page == 'feed' %}
+A
+Aaj kya share karein?...
+📷 Photo 🎬 Video 📍 Location Post Karo
+Sponsored
+🛍️
+Flipkart Big Sale — 80% Off!
+Electronics, Fashion, Home — sab par badi chhutt. Sirf aaj!
+Shop Now
+{% for p in posts %}
+{{ p.avatar }}
+{{ p.author }}
+{{ p.time }} · {{ p.location }}
+{{ p.content }}
+{% if p.thumbnail %}
+🖼
+{% endif %}
+{{ "{:,}".format(p.likes) }} likes · {{ "{:,}".format(p.comments) }} comments · {{ "{:,}".format(p.shares) }} shares
+ Like
+Comment
+Share
+Save
+{% if loop.index == 2 %}
+Ad
+🎮
+BGMI — Naya Season! ₹100 Free UC
+New map, weapons, naye characters. Abhi download karo!
+Download Free
+{% endif %} {% endfor %}
+{% endif %} {# ══════════════════ ARTICLES ══════════════════ #} {% if page == 'article' %}
+Sab
+Technology
+Sports
+Health
+Business
+{% for a in articles %} {% if loop.first %}
+{% if a.thumbnail %} {% else %}
+📰
+{% endif %}
+{{ a.category }}
+{{ a.read_time }} read
+{{ a.title }}
+{{ a.excerpt }}
+{{ a.initials }}
+{{ a.author }}·{{ a.date }}· {{ a.reads }} reads
+{% else %}
+{% if a.thumbnail %} {% else %}
+📰
+{% endif %}
+{{ a.title }}
+{{ a.author }} · {{ a.reads }} reads · {{ a.read_time }} read
+{% if loop.index == 3 %}
+Sponsored
+📈
+Zerodha — India ka #1 Broker. Free demat account!
+₹0 brokerage on equity delivery. 10 min mein account kholo!
+Account Kholo
+{% endif %} {% endif %} {% endfor %} {% endif %} {# ══════════════════ WRITE ══════════════════ #} {% if page == 'write' %}
+✍️ Apna Article Likho
+{% if success %}
+🎉 Article published! "{{ pub_title }}" ab sab ko dikh raha hai!
+{% endif %}
+Article ka title likhein...
+ 
+Yahan apna article likhein...
+
+Technology
+ 
+Hindi
+ Publish Karo →
+{% endif %} {# ══════════════════ VIDEO ══════════════════ #} {% if page == 'video' %}
+🎬 Trending Videos
+SabCricketComedy TechMusicCooking
+{% set videos = [ ("https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Cricket_ball_old.jpg/320px-Cricket_ball_old.jpg","IND vs PAK Final — Best Moments 2026","CricketHub · 4.2M views","8:42"), ("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Guitar_chords.jpg/320px-Guitar_chords.jpg","Arijit Singh Live Concert 2026 — Full Show","MusicIndia · 9.8M views","1:24:18"), ("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/320px-Python-logo-notext.svg.png","iPhone 17 vs Galaxy S26 — Honest Review","TechDost · 1.1M views","15:30"), ("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Biryani_Home_Cooked.jpg/320px-Biryani_Home_Cooked.jpg","Restaurant Wali Biryani Ghar Par","KhanaKhazana · 3.5M views","18:00"), ("https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/320px-The_Earth_seen_from_Apollo_17.jpg","ISRO Moon Mission — Full Documentary","SpaceIndia · 5.8M views","42:10"), ("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Indian_500_rupee_note_%28obverse%29.jpg/320px-Indian_500_rupee_note_%28obverse%29.jpg","2026 mein Kahan Invest Karein","PaiseKiBaat · 2.3M views","22:05"), ] %} {% for thumb, title, ch, dur in videos %}
+{{ dur }}
+▶
+{{ title }}
+{{ ch }}
+{% endfor %}
+{% endif %} {# ══════════════════ NEWS ══════════════════ #} {% if page == 'news' %}
+Breaking News
+{% for item in news %}
+{% if item.thumbnail %} {% else %}
+{{ item.emoji }}
+{% endif %}
+{{ item.badge }}{{ item.title }}
+{{ item.source }} · {{ item.time }}
+{% if loop.index == 2 %}
+Ad
+🏦
+HDFC Bank — Zero Fee Account
+Instant opening, 7% FD, free debit card.
+Apply Now
+{% endif %} {% endfor %} {% endif %} {# ══════════════════ SHOP ══════════════════ #} {% if page == 'shop' %}
+Mega Sale · Ad
+🛒
+Amazon Great India Sale — Up to 80% Off!
+Electronics, Fashion, Home — sab par badi chhoot. Free delivery!
+Shop Now
+Ends in: 14:23:47
+SabElectronicsFashion HomeBooks
+{% for p in products %}
+{% if p.thumbnail %} {{ p.name }} {% else %} {{ p.emoji }} {% endif %}
+{{ p.name }}
+{% for i in range(p.stars) %}★{% endfor %}{% for i in range(5-p.stars) %}☆{% endfor %}
+{{ p.price }}
+{{ p.old }}{{ p.disc }} off
+{% endfor %}
+{% endif %} {# ══════════════════ WIKI ══════════════════ #} {% if page == 'wiki' %}
+📚 Wikipedia — Auto Article Fetch
+{{ wiki_query or '' }}
+{% if wiki_query and wiki_results %}
+"{{ wiki_query }}" ke liye {{ wiki_results|length }} Wikipedia articles mile
+{% for r in wiki_results %}
+{% if r.thumbnail %} {% endif %}
+{{ r.title }}
+{{ r.excerpt }}
+📖 wikipedia.org/wiki/{{ r.title | replace(' ','_') }}
+{% endfor %} {% elif wiki_trending %}
+🔥 Wikipedia Today's Most Read Articles
+{% for r in wiki_trending %}
+{% if r.thumbnail %} {% endif %}
+{{ r.title }}
+{{ r.excerpt }}
+👁 {{ r.views }} views today · wikipedia.org
+{% endfor %} {% else %}
+🌐
+Wikipedia articles load hone ke liye internet connection chahiye.
+Ya upar search karo to try karo!
+{% endif %} {% endif %} {# ══════════════════ MESSAGES ══════════════════ #} {% if page == 'msg' %}
+💬 Messages
+{% set convos = [ ("👩","rgba(235,69,158,.15)","Priya Singh","2 min","Haan bhai, kal milte hain coffee pe!",True), ("👦","rgba(88,101,242,.15)","Arjun Mehta","15 min","Yaar match dekha? India ne kya batting ki!",True), ("💻","rgba(35,209,139,.15)","Tech India Group","1 hr","Neha: Naya AI tool dekha?",False), ("👩‍🦳","rgba(250,166,26,.15)","Maa","3 hr","Beta, khaana khaya? Ghar kab aoge?",False), ("🧑","rgba(255,107,53,.15)","Rahul Sharma","Yesterday","Kal party mein aana mat bhoolna!",False), ] %} {% for emoji, bg, name, time, preview, online in convos %}
+{{ emoji }}
+{% if online %}
+{% endif %}
+{{ name }}
+{{ time }}
+{{ preview }}
+{% endfor %}
+{% endif %} {# ══════════════════ NOTIFICATIONS ══════════════════ #} {% if page == 'notif' %}
+🔔 Notifications
+{% set notifs = [ ("🧑","rgba(88,101,242,.15)","Rahul Sharma ne aapki post like ki: \"Bilkul sahi baat!\"","5 min pehle",True), ("👩","rgba(235,69,158,.15)","Priya Singh ne aapko follow kiya","12 min pehle",True), ("📰","rgba(35,209,139,.15)","Aapka article 1,000 reads reach kar gaya!","1 ghanta pehle",True), ("🎉","rgba(250,166,26,.15)","Aapke post ko 500 likes mile! Trending ho raha hai.","2 ghante pehle",True), ("💬","rgba(255,107,53,.15)","Tech India Group mein 23 nayi messages hain","3 ghante pehle",False), ("✅","rgba(35,209,139,.15)","Aapka account verified ho gaya! Blue tick mila.","1 din pehle",False), ] %} {% for emoji, bg, text, time, unread in notifs %}
+{{ emoji }}
+{{ text }}
+{{ time }}
+{% endfor %}
+{% endif %} {# ══════════════════ PROFILE ══════════════════ #} {% if page == 'profile' %}
+A
+Aap ka Naam
+@username · Meerut, UP
+Viralix par active hoon. Technology, cricket, aur life ke baare mein likhta hoon.
+247
+Following
+1.2K
+Followers
+{{ articles|length }}
+Articles
+84K
+Reads
+Naya Article Likho →
+{% for a in articles %}
+{% if a.thumbnail %} {% else %}
+📰
+{% endif %}
+{{ a.title }}
+{{ a.reads }} reads · {{ a.read_time }} read · {{ a.category }}
+{% endfor %} {% endif %}
+Live Scores
+ICC T20 · Live
+IND 186 vs 142 PAK
+India aage · 44 runs lead
+Mausam
+32°C
+Meerut, UP
+☀
+45%Humidity
+12km/hWind
+Markets
+Sensex1,02,345+1.2%
+Nifty 5031,280+0.9%
+USD/INR83.42-0.3%
+Gold₹72,450+0.5%
+Trending
+{% for tag, vol in [("#ISROonMoon","2.8M"),("SensexRecord","1.9M"),("IPL 2026","1.4M"),("#IndiaAI","980K"),("Arijit Song","760K")] %}
+{{ loop.index }}
+{{ tag }}
+{{ vol }} posts
+{% endfor %}
+Follow Karein
+{% for emoji, bg, name, flw in [("🤖","rgba(88,101,242,.15)","Tech India","2.4M"),("🎵","rgba(235,69,158,.15)","Music Vibes","5.8M"),("📰","rgba(35,209,139,.15)","NDTV India","12M")] %}
+{{ emoji }}
+{{ name }}
+{{ flw }} followers
+Follow
+{% endfor %}
+Sponsored
+🎯
+Google Ads
+Apna business grow karo!
+Start Now
