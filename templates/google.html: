@@ -1,0 +1,51 @@
+{% if not query %}
+Viralix
+Kuch bhi khojo — news, wiki, khabar...
+Viralix Search
+Main Lucky Hoon
+Trending Searches
+{% for t in ["India AI","IPL 2026","ISRO Moon","Biryani Recipe","Stock Market","Bollywood","Cricket World Cup","Electric Cars India"] %}
+{{ t }}
+{% endfor %}
+{% else %}
+Viralix
+{{ query }}
+← Viralix
+{% if results %}
+{{ results|length * 13 | int }},400 results milein (0.42 seconds)
+{% set first = results[0] %}
+Featured Snippet — Wikipedia
+{% if first.thumbnail %} {% endif %}
+{{ first.title }}
+{{ first.excerpt }}
+wikipedia.org › {{ first.title }}
+People Also Ask
+{% for r in results[1:4] %}
+{{ r.title }} kya hai?
+▼
+{% endfor %}
+Sponsored
+📚
+Coursera — {{ query }} Course Free mein Sikho!
+World's best universities ke courses. Certificate milega. Abhi join karo!
+Free mein Try Karo
+{% for r in results %}
+W
+wikipedia.org › wiki › {{ r.title | replace(' ','_') }}
+{{ r.title }}
+{{ r.excerpt }}
+{% if r.thumbnail %} {% else %}
+🔍
+{% endif %}
+{% endfor %}
+Ad
+📈
+Zerodha — India's #1 Stock Broker
+Free demat account. ₹0 brokerage on equity delivery. Open in 10 minutes!
+Account Kholo
+{% else %}
+🔍
+Koi result nahi mila "{{ query }}" ke liye
+Spelling check karo ya doosra query try karo
+{% endif %}
+{% endif %}
