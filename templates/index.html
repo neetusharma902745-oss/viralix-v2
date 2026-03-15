@@ -136,9 +136,14 @@
   </div>
   <div class="post-body">{{ p.content }}</div>
   {% if p.thumbnail %}
-  <div class="post-thumb-wrap">
-    <img class="post-thumb" src="{{ p.thumbnail }}" alt="{{ p.author }}" onerror="this.parentElement.innerHTML='<div class=post-thumb-ph>🖼</div>'">
+  <div class="post-thumb-wrap" {% if p.wiki_url is defined and p.wiki_url %}onclick="window.open('{{ p.wiki_url }}','_blank')" style="cursor:pointer"{% endif %}>
+    <img class="post-thumb" src="{{ p.thumbnail }}" alt="{{ p.author }}" onerror="this.parentElement.style.display='none'">
     {% if p.img_label %}<div class="post-img-label">{{ p.img_label }}</div>{% endif %}
+    {% if p.wiki_url is defined and p.wiki_url %}<div class="post-img-label" style="left:auto;right:12px;background:rgba(88,101,242,.85)">Wikipedia →</div>{% endif %}
+  </div>
+  {% elif p.wiki_url is defined and p.wiki_url %}
+  <div style="padding:0 14px 10px">
+    <a href="{{ p.wiki_url }}" target="_blank" style="display:inline-block;background:rgba(88,101,242,.15);color:var(--ac);padding:5px 12px;border-radius:7px;font-size:12px;text-decoration:none">📖 Wikipedia par poora padhein →</a>
   </div>
   {% endif %}
   <div class="post-stats">{{ "{:,}".format(p.likes) }} likes · {{ "{:,}".format(p.comments) }} comments · {{ "{:,}".format(p.shares) }} shares</div>
@@ -502,12 +507,18 @@
       <div class="wst"><b>12km/h</b>Wind</div>
     </div>
   </div>
-  <div class="sb-hd">Markets</div>
+  <div class="sb-hd">Markets <span style="font-size:9px;color:var(--txt3);font-weight:400">Live</span></div>
   <div style="background:var(--bg3);border-radius:9px;padding:10px 12px;margin-bottom:10px">
-    <div class="stk-row"><span class="stk-n">Sensex</span><span class="stk-p">1,02,345</span><span class="stk-c up">+1.2%</span></div>
-    <div class="stk-row"><span class="stk-n">Nifty 50</span><span class="stk-p">31,280</span><span class="stk-c up">+0.9%</span></div>
-    <div class="stk-row"><span class="stk-n">USD/INR</span><span class="stk-p">83.42</span><span class="stk-c dn">-0.3%</span></div>
-    <div class="stk-row"><span class="stk-n">Gold</span><span class="stk-p">₹72,450</span><span class="stk-c up">+0.5%</span></div>
+    {% if stocks %}
+      {% for name, val in stocks.items() %}{% if val %}
+      <div class="stk-row"><span class="stk-n">{{ name }}</span><span class="stk-p">{{ val.price }}</span><span class="stk-c {{ 'up' if val.up else 'dn' }}">{{ val.chg }}</span></div>
+      {% endif %}{% endfor %}
+    {% else %}
+      <div class="stk-row"><span class="stk-n">Sensex</span><span class="stk-p" id="s-sensex">--</span><span class="stk-c" id="c-sensex"></span></div>
+      <div class="stk-row"><span class="stk-n">Nifty 50</span><span class="stk-p" id="s-nifty">--</span><span class="stk-c" id="c-nifty"></span></div>
+      <div class="stk-row"><span class="stk-n">USD/INR</span><span class="stk-p" id="s-usdinr">--</span><span class="stk-c" id="c-usdinr"></span></div>
+      <div class="stk-row"><span class="stk-n">Gold</span><span class="stk-p" id="s-gold">--</span><span class="stk-c" id="c-gold"></span></div>
+    {% endif %}
   </div>
   <div class="sb-hd">Trending</div>
   <div style="background:var(--bg3);border-radius:9px;padding:10px 12px;margin-bottom:10px">
