@@ -217,14 +217,76 @@ products = [
 #  Routes
 # ─────────────────────────────────────────────
 
+# Cache for wikipedia daily articles (refreshes daily)
+_wiki_cache = {"date": None, "articles": [], "feed_posts": []}
+
+def get_daily_wiki_articles():
+    """Wikipedia se aaj ki top articles fetch karo — daily auto-refresh"""
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    if _wiki_cache["date"] == today and _wiki_cache["articles"]:
+        return _wiki_cache["articles"]
+    trending = wiki_trending()
+    wiki_articles = []
+    for i, item in enumerate(trending[:5]):
+        wiki_articles.append({
+            "id": 1000 + i,
+            "author": "Wikipedia",
+            "avatar": "📖",
+            "location": "Wikipedia · Auto-fetched",
+            "time": "Aaj",
+            "content": f"{item['title']} — {item['excerpt']}",
+            "likes": int(item.get("views","0").replace(",","")),
+            "comments": 0,
+            "shares": 0,
+            "thumbnail": item.get("thumbnail"),
+            "img_label": f"Wikipedia — {item['views']} views aaj",
+            "wiki_url": item.get("url", "#"),
+        })
+    _wiki_cache["date"] = today
+    _wiki_cache["articles"] = wiki_articles
+    return wiki_articles
+
 @app.route("/")
 @app.route("/feed")
 def feed():
-    return render_template("index.html", posts=posts, page="feed")
+    # Wikipedia ke aaj ke articles posts mein mix karo
+    wiki_posts = []
+    try:
+        wiki_posts = get_daily_wiki_articles()
+    except Exception:
+        pass
+    all_posts = []
+    for i, p in enumerate(posts):
+        all_posts.append(p)
+        # Har 2 posts ke baad 1 Wikipedia article
+        if (i + 1) % 2 == 0 and wiki_posts:
+            idx = (i // 2) % len(wiki_posts)
+            all_posts.append(wiki_posts[idx])
+    return render_template("index.html", posts=all_posts, page="feed")
 
 @app.route("/articles")
 def articles_page():
-    return render_template("index.html", articles=articles, page="article")
+    # Wikipedia se nayi articles bhi mix karo
+    wiki_arts = []
+    try:
+        for item in wiki_trending()[:4]:
+            wiki_arts.append({
+                "id": 9000 + len(wiki_arts),
+                "title": item["title"],
+                "excerpt": item["excerpt"],
+                "author": "Wikipedia",
+                "initials": "WP",
+                "date": datetime.utcnow().strftime("%d %B %Y"),
+                "reads": item.get("views", "0") + " views",
+                "read_time": "5 min",
+                "category": "Wikipedia",
+                "thumbnail": item.get("thumbnail"),
+                "bg": "#0a1a0a",
+            })
+    except Exception:
+        pass
+    all_articles = articles + wiki_arts
+    return render_template("index.html", articles=all_articles, page="article")
 
 @app.route("/write", methods=["GET", "POST"])
 def write():
