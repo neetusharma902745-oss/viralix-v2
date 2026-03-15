@@ -1,34 +1,30 @@
 """
 Viralix — India's #1 Social + News + Wiki Platform
-Flask backend with Wikipedia auto-fetch, thumbnails, ads
+Flask backend — Wikipedia auto-fetch, real stock prices, thumbnails
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 from datetime import datetime
-import json, urllib.parse, urllib.request, html
+import json, urllib.parse, urllib.request, html, os
 
 app = Flask(__name__)
 
-# ─────────────────────────────────────────────
-#  Wikipedia API helper  (no pip package needed)
-# ─────────────────────────────────────────────
+# ──────────────────────────────────────────────
+#  Wikipedia API helpers
+# ──────────────────────────────────────────────
 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
 
 def wiki_search(query, limit=6):
-    """Search Wikipedia and return list of {title, excerpt, thumbnail, url}"""
     params = {
-        "action": "query",
-        "list": "search",
-        "srsearch": query,
-        "srlimit": limit,
-        "format": "json",
-        "utf8": 1,
+        "action": "query", "list": "search",
+        "srsearch": query, "srlimit": limit,
+        "format": "json", "utf8": 1,
     }
     url = WIKI_API + "?" + urllib.parse.urlencode(params)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Viralix/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as r:
+        with urllib.request.urlopen(req, timeout=8) as r:
             data = json.loads(r.read())
         results = []
         for item in data.get("query", {}).get("search", []):
@@ -41,26 +37,22 @@ def wiki_search(query, limit=6):
                 "thumbnail": get_wiki_thumbnail(title),
             })
         return results
-    except Exception:
+    except Exception as e:
+        print(f"Wiki search error: {e}")
         return []
 
 def get_wiki_thumbnail(title):
-    """Fetch thumbnail URL for a Wikipedia article"""
     params = {
-        "action": "query",
-        "titles": title,
-        "prop": "pageimages",
-        "pithumbsize": 300,
-        "format": "json",
-        "utf8": 1,
+        "action": "query", "titles": title,
+        "prop": "pageimages", "pithumbsize": 300,
+        "format": "json", "utf8": 1,
     }
     url = WIKI_API + "?" + urllib.parse.urlencode(params)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Viralix/1.0"})
-        with urllib.request.urlopen(req, timeout=4) as r:
+        with urllib.request.urlopen(req, timeout=5) as r:
             data = json.loads(r.read())
-        pages = data.get("query", {}).get("pages", {})
-        for page in pages.values():
+        for page in data.get("query", {}).get("pages", {}).values():
             thumb = page.get("thumbnail", {}).get("source")
             if thumb:
                 return thumb
@@ -69,18 +61,14 @@ def get_wiki_thumbnail(title):
     return None
 
 def wiki_trending():
-    """Fetch today's featured article from Wikipedia"""
     today = datetime.utcnow()
-    url = (
-        f"https://en.wikipedia.org/api/rest_v1/feed/featured/"
-        f"{today.year}/{today.month:02d}/{today.day:02d}"
-    )
+    url = (f"https://en.wikipedia.org/api/rest_v1/feed/featured/"
+           f"{today.year}/{today.month:02d}/{today.day:02d}")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Viralix/1.0"})
-        with urllib.request.urlopen(req, timeout=6) as r:
+        with urllib.request.urlopen(req, timeout=8) as r:
             data = json.loads(r.read())
         articles = []
-        # Most read articles
         for item in data.get("mostread", {}).get("articles", [])[:8]:
             articles.append({
                 "title": item.get("title", "").replace("_", " "),
@@ -90,22 +78,62 @@ def wiki_trending():
                 "views": f"{item.get('views', 0):,}",
             })
         return articles
-    except Exception:
+    except Exception as e:
+        print(f"Wiki trending error: {e}")
         return []
 
-# ─────────────────────────────────────────────
-#  Static data
-# ─────────────────────────────────────────────
+# ──────────────────────────────────────────────
+#  Real Stock Prices (Yahoo Finance — no API key)
+# ──────────────────────────────────────────────
 
-THUMBNAILS = [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Left_side_of_flying_airplane.jpg/320px-Left_side_of_flying_airplane.jpg",
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Biryani_Home_Cooked.jpg/320px-Biryani_Home_Cooked.jpg",
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Sunrise_over_the_sea.jpg/320px-Sunrise_over_the_sea.jpg",
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Image_created_with_a_mobile_phone.png/320px-Image_created_with_a_mobile_phone.png",
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/320px-Camponotus_flavomarginatus_ant.jpg",
-]
+_stock_cache = {"time": None, "data": None}
 
-EMOJI_THUMBS = {
+def get_stock_prices():
+    import time
+    now = time.time()
+    # Cache 5 minutes
+    if _stock_cache["time"] and now - _stock_cache["time"] < 300 and _stock_cache["data"]:
+        return _stock_cache["data"]
+    symbols = {
+        "Sensex": "^BSESN",
+        "Nifty 50": "^NSEI",
+        "USD/INR": "INR=X",
+        "Gold": "GC=F",
+    }
+    results = {}
+    for name, sym in symbols.items():
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?interval=1d&range=2d"
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json"
+            })
+            with urllib.request.urlopen(req, timeout=6) as r:
+                data = json.loads(r.read())
+            meta = data["chart"]["result"][0]["meta"]
+            price = meta.get("regularMarketPrice", 0)
+            prev  = meta.get("previousClose", price)
+            chg   = ((price - prev) / prev * 100) if prev else 0
+            if name == "Gold":
+                # Convert USD/oz to INR/10g approx
+                price = round(price * 83.4 * 0.32, 0)
+                results[name] = {"price": f"₹{price:,.0f}", "chg": f"{chg:+.1f}%", "up": chg >= 0}
+            elif name == "USD/INR":
+                results[name] = {"price": f"{price:.2f}", "chg": f"{chg:+.2f}%", "up": chg >= 0}
+            else:
+                results[name] = {"price": f"{price:,.2f}", "chg": f"{chg:+.1f}%", "up": chg >= 0}
+        except Exception as e:
+            print(f"Stock error {name}: {e}")
+            results[name] = None
+    _stock_cache["time"] = now
+    _stock_cache["data"] = results
+    return results
+
+# ──────────────────────────────────────────────
+#  Static thumbnail URLs (Wikimedia Commons)
+# ──────────────────────────────────────────────
+
+T = {
     "tech":    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/320px-Python-logo-notext.svg.png",
     "cricket": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Cricket_ball_old.jpg/320px-Cricket_ball_old.jpg",
     "food":    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Biryani_Home_Cooked.jpg/320px-Biryani_Home_Cooked.jpg",
@@ -114,197 +142,153 @@ EMOJI_THUMBS = {
     "money":   "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Indian_500_rupee_note_%28obverse%29.jpg/320px-Indian_500_rupee_note_%28obverse%29.jpg",
 }
 
+# ──────────────────────────────────────────────
+#  In-memory data
+# ──────────────────────────────────────────────
+
 posts = [
-    {
-        "id": 1, "author": "Rahul Sharma", "avatar": "🧑",
-        "location": "Delhi", "time": "5 min pehle",
-        "content": "India ne aaj ek naya AI record toda! Ab hum duniya mein 3rd position par hain. #IndiaAI #TechIndia",
-        "likes": 2400, "comments": 318, "shares": 89,
-        "thumbnail": EMOJI_THUMBS["tech"],
-        "img_label": "AI Summit 2026, Bangalore",
-    },
-    {
-        "id": 2, "author": "Priya Singh", "avatar": "👩",
-        "location": "Mumbai", "time": "22 min pehle",
-        "content": "Marine Drive ka ye sunset — ekdum magical tha! Mumbai zindaabad 🌆 #Mumbai #Sunset",
-        "likes": 5100, "comments": 421, "shares": 212,
-        "thumbnail": EMOJI_THUMBS["space"],
-        "img_label": "Marine Drive, Mumbai",
-    },
-    {
-        "id": 3, "author": "Cricket Guru", "avatar": "🏏",
-        "location": "Trending", "time": "1 ghanta pehle",
-        "content": "India ne ICC T20 World Cup jeeta! Rohit Sharma ka shandar performance. #Cricket #TeamIndia",
-        "likes": 18200, "comments": 2100, "shares": 4800,
-        "thumbnail": EMOJI_THUMBS["cricket"],
-        "img_label": "ICC T20 World Cup 2026",
-    },
-    {
-        "id": 4, "author": "Food Lover", "avatar": "🍛",
-        "location": "Lucknow", "time": "2 ghante pehle",
-        "content": "Lucknawi Biryani ki recipe share kar raha hoon — ghar par banao restaurant jaisi! #Food #Recipe",
-        "likes": 7600, "comments": 943, "shares": 1200,
-        "thumbnail": EMOJI_THUMBS["food"],
-        "img_label": "Lucknawi Dum Biryani",
-    },
+    {"id":1,"author":"Rahul Sharma","avatar":"🧑","location":"Delhi","time":"5 min pehle",
+     "content":"India ne aaj ek naya AI record toda! Ab hum duniya mein 3rd position par hain. #IndiaAI #TechIndia",
+     "likes":2400,"comments":318,"shares":89,"thumbnail":T["tech"],"img_label":"AI Summit 2026, Bangalore"},
+    {"id":2,"author":"Priya Singh","avatar":"👩","location":"Mumbai","time":"22 min pehle",
+     "content":"Marine Drive ka ye sunset — ekdum magical tha! Mumbai zindaabad 🌆 #Mumbai #Sunset",
+     "likes":5100,"comments":421,"shares":212,"thumbnail":T["space"],"img_label":"Marine Drive, Mumbai"},
+    {"id":3,"author":"Cricket Guru","avatar":"🏏","location":"Trending","time":"1 ghanta pehle",
+     "content":"India ne ICC T20 World Cup jeeta! Rohit Sharma ka shandar performance. #Cricket #TeamIndia",
+     "likes":18200,"comments":2100,"shares":4800,"thumbnail":T["cricket"],"img_label":"ICC T20 World Cup 2026"},
+    {"id":4,"author":"Food Lover","avatar":"🍛","location":"Lucknow","time":"2 ghante pehle",
+     "content":"Lucknawi Biryani ki recipe — ghar par banao restaurant jaisi! #Food #Recipe",
+     "likes":7600,"comments":943,"shares":1200,"thumbnail":T["food"],"img_label":"Lucknawi Dum Biryani"},
 ]
 
 articles = [
-    {
-        "id": 1, "title": "AI ka Bhavishya: 2030 tak kya badlega?",
-        "excerpt": "Artificial Intelligence sirf ek technology nahi — yeh ek revolution hai. 2030 tak AI doctors se behtar diagnose karega...",
-        "author": "Rohit Kumar", "initials": "RK", "date": "14 March 2026",
-        "reads": "12.3K", "read_time": "8 min", "category": "Technology",
-        "thumbnail": EMOJI_THUMBS["tech"], "bg": "#0a0a20",
-    },
-    {
-        "id": 2, "title": "IPL 2026 — Kaunsi Team Trophy Uthayegi?",
-        "excerpt": "Is saal IPL mein competition bahut tough hai. Har team ne naye players liye hain...",
-        "author": "Cricket Guru", "initials": "CG", "date": "13 March 2026",
-        "reads": "9.8K", "read_time": "5 min", "category": "Sports",
-        "thumbnail": EMOJI_THUMBS["cricket"], "bg": "#1a0808",
-    },
-    {
-        "id": 3, "title": "Ghar Baithe Paise Kamao — 10 Tarike",
-        "excerpt": "Internet ne aaj har ghar mein paise kamane ke mauqe de diye hain...",
-        "author": "FinanceGuru", "initials": "FG", "date": "12 March 2026",
-        "reads": "24.1K", "read_time": "7 min", "category": "Business",
-        "thumbnail": EMOJI_THUMBS["money"], "bg": "#081a08",
-    },
-    {
-        "id": 4, "title": "ISRO Chandrayaan-4 — India ka Moon Mission",
-        "excerpt": "ISRO ne ek baar phir itihaas rachha! Chandrayaan-4 safaltapurvak launch hua...",
-        "author": "Space India", "initials": "SI", "date": "11 March 2026",
-        "reads": "31.5K", "read_time": "6 min", "category": "Science",
-        "thumbnail": EMOJI_THUMBS["space"], "bg": "#080820",
-    },
+    {"id":1,"title":"AI ka Bhavishya: 2030 tak kya badlega?",
+     "excerpt":"Artificial Intelligence sirf ek technology nahi — yeh ek revolution hai. 2030 tak AI doctors se behtar diagnose karega...",
+     "author":"Rohit Kumar","initials":"RK","date":"14 March 2026","reads":"12.3K","read_time":"8 min",
+     "category":"Technology","thumbnail":T["tech"],"bg":"#0a0a20"},
+    {"id":2,"title":"IPL 2026 — Kaunsi Team Trophy Uthayegi?",
+     "excerpt":"Is saal IPL mein competition bahut tough hai. Har team ne naye players liye hain...",
+     "author":"Cricket Guru","initials":"CG","date":"13 March 2026","reads":"9.8K","read_time":"5 min",
+     "category":"Sports","thumbnail":T["cricket"],"bg":"#1a0808"},
+    {"id":3,"title":"Ghar Baithe Paise Kamao — 10 Tarike",
+     "excerpt":"Internet ne aaj har ghar mein paise kamane ke mauqe de diye hain...",
+     "author":"FinanceGuru","initials":"FG","date":"12 March 2026","reads":"24.1K","read_time":"7 min",
+     "category":"Business","thumbnail":T["money"],"bg":"#081a08"},
+    {"id":4,"title":"ISRO Chandrayaan-4 — India ka Moon Mission",
+     "excerpt":"ISRO ne ek baar phir itihaas rachha! Chandrayaan-4 safaltapurvak launch hua...",
+     "author":"Space India","initials":"SI","date":"11 March 2026","reads":"31.5K","read_time":"6 min",
+     "category":"Science","thumbnail":T["space"],"bg":"#080820"},
 ]
 
 news_items = [
-    {"emoji": "🚀", "badge": "Breaking", "btype": "r",
-     "title": "ISRO ka Chandrayaan-4 moon par safely utaraa — India ne rachha naya itihaas!",
-     "source": "ISRO", "time": "8 min pehle",
-     "thumbnail": EMOJI_THUMBS["space"]},
-    {"emoji": "💰", "badge": "Economy",  "btype": "b",
-     "title": "Sensex pehli baar 1 lakh ke paar — share market mein investors ka josh",
-     "source": "ET Markets", "time": "34 min pehle",
-     "thumbnail": EMOJI_THUMBS["money"]},
-    {"emoji": "🏏", "badge": "Sports",   "btype": "g",
-     "title": "India ne ICC T20 World Cup 2026 jeeta! Rohit Sharma Man of Tournament",
-     "source": "Cricinfo", "time": "1 ghanta pehle",
-     "thumbnail": EMOJI_THUMBS["cricket"]},
-    {"emoji": "🤖", "badge": "Tech",     "btype": "b",
-     "title": "OpenAI ka GPT-6 launch — ek hi prompt mein 10 ghante ka kaam",
-     "source": "TechCrunch", "time": "2 ghante pehle",
-     "thumbnail": EMOJI_THUMBS["tech"]},
-    {"emoji": "🍛", "badge": "Lifestyle","btype": "g",
-     "title": "Lucknow ki biryani UNESCO heritage list mein shamil — India ka garv",
-     "source": "Times of India", "time": "3 ghante pehle",
-     "thumbnail": EMOJI_THUMBS["food"]},
+    {"emoji":"🚀","badge":"Breaking","btype":"r",
+     "title":"ISRO ka Chandrayaan-4 moon par safely utaraa — India ne rachha naya itihaas!",
+     "source":"ISRO","time":"8 min pehle","thumbnail":T["space"]},
+    {"emoji":"💰","badge":"Economy","btype":"b",
+     "title":"Sensex pehli baar 1 lakh ke paar — share market mein investors ka josh",
+     "source":"ET Markets","time":"34 min pehle","thumbnail":T["money"]},
+    {"emoji":"🏏","badge":"Sports","btype":"g",
+     "title":"India ne ICC T20 World Cup 2026 jeeta! Rohit Sharma Man of Tournament",
+     "source":"Cricinfo","time":"1 ghanta pehle","thumbnail":T["cricket"]},
+    {"emoji":"🤖","badge":"Tech","btype":"b",
+     "title":"OpenAI ka GPT-6 launch — ek hi prompt mein 10 ghante ka kaam",
+     "source":"TechCrunch","time":"2 ghante pehle","thumbnail":T["tech"]},
+    {"emoji":"🍛","badge":"Lifestyle","btype":"g",
+     "title":"Lucknow ki biryani UNESCO heritage list mein shamil — India ka garv",
+     "source":"Times of India","time":"3 ghante pehle","thumbnail":T["food"]},
 ]
 
 products = [
-    {"emoji": "📱", "name": "Smartphone Pro 2026",    "stars": 5, "price": "₹24,999", "old": "₹45,000", "disc": "44%",
-     "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Image_created_with_a_mobile_phone.png/120px-Image_created_with_a_mobile_phone.png"},
-    {"emoji": "💻", "name": "Gaming Laptop Ultra",    "stars": 4, "price": "₹69,999", "old": "₹99,999", "disc": "30%", "thumbnail": None},
-    {"emoji": "🎧", "name": "Noise-Cancel Headphones","stars": 5, "price": "₹4,499",  "old": "₹8,999",  "disc": "50%", "thumbnail": None},
-    {"emoji": "⌚", "name": "Smart Watch Series 8",   "stars": 4, "price": "₹12,999", "old": "₹19,999", "disc": "35%", "thumbnail": None},
-    {"emoji": "📷", "name": "DSLR Camera Kit",        "stars": 5, "price": "₹38,999", "old": "₹55,000", "disc": "29%", "thumbnail": None},
-    {"emoji": "🖥",  "name": '4K Monitor 32"',         "stars": 4, "price": "₹22,499", "old": "₹34,999", "disc": "36%", "thumbnail": None},
+    {"emoji":"📱","name":"Smartphone Pro 2026","stars":5,"price":"₹24,999","old":"₹45,000","disc":"44%","thumbnail":None},
+    {"emoji":"💻","name":"Gaming Laptop Ultra","stars":4,"price":"₹69,999","old":"₹99,999","disc":"30%","thumbnail":None},
+    {"emoji":"🎧","name":"Noise-Cancel Headphones","stars":5,"price":"₹4,499","old":"₹8,999","disc":"50%","thumbnail":None},
+    {"emoji":"⌚","name":"Smart Watch Series 8","stars":4,"price":"₹12,999","old":"₹19,999","disc":"35%","thumbnail":None},
+    {"emoji":"📷","name":"DSLR Camera Kit","stars":5,"price":"₹38,999","old":"₹55,000","disc":"29%","thumbnail":None},
+    {"emoji":"🖥","name":'4K Monitor 32"',"stars":4,"price":"₹22,499","old":"₹34,999","disc":"36%","thumbnail":None},
 ]
 
-# ─────────────────────────────────────────────
-#  Routes
-# ─────────────────────────────────────────────
+# ──────────────────────────────────────────────
+#  Wikipedia daily cache
+# ──────────────────────────────────────────────
 
-# Cache for wikipedia daily articles (refreshes daily)
-_wiki_cache = {"date": None, "articles": [], "feed_posts": []}
+_wiki_cache = {"date": None, "trending": [], "feed_posts": []}
 
-def get_daily_wiki_articles():
-    """Wikipedia se aaj ki top articles fetch karo — daily auto-refresh"""
+def get_wiki_daily():
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    if _wiki_cache["date"] == today and _wiki_cache["articles"]:
-        return _wiki_cache["articles"]
+    if _wiki_cache["date"] == today and _wiki_cache["trending"]:
+        return _wiki_cache["trending"]
     trending = wiki_trending()
-    wiki_articles = []
-    for i, item in enumerate(trending[:5]):
-        wiki_articles.append({
-            "id": 1000 + i,
-            "author": "Wikipedia",
-            "avatar": "📖",
-            "location": "Wikipedia · Auto-fetched",
-            "time": "Aaj",
-            "content": f"{item['title']} — {item['excerpt']}",
-            "likes": int(item.get("views","0").replace(",","")),
-            "comments": 0,
-            "shares": 0,
-            "thumbnail": item.get("thumbnail"),
-            "img_label": f"Wikipedia — {item['views']} views aaj",
-            "wiki_url": item.get("url", "#"),
-        })
     _wiki_cache["date"] = today
-    _wiki_cache["articles"] = wiki_articles
-    return wiki_articles
+    _wiki_cache["trending"] = trending
+    return trending
+
+# ──────────────────────────────────────────────
+#  Routes
+# ──────────────────────────────────────────────
 
 @app.route("/")
 @app.route("/feed")
 def feed():
-    # Wikipedia ke aaj ke articles posts mein mix karo
     wiki_posts = []
     try:
-        wiki_posts = get_daily_wiki_articles()
-    except Exception:
-        pass
+        for i, item in enumerate(get_wiki_daily()[:4]):
+            wiki_posts.append({
+                "id": 1000+i, "author": "Wikipedia 📖",
+                "avatar": "🌐", "location": "Wikipedia · Auto-fetched",
+                "time": "Aaj · " + datetime.utcnow().strftime("%d %b"),
+                "content": f"📰 {item['title']} — {item['excerpt']}",
+                "likes": int(item.get("views","0").replace(",","")),
+                "comments": 0, "shares": 0,
+                "thumbnail": item.get("thumbnail"),
+                "img_label": f"📖 Wikipedia · {item['views']} views aaj",
+                "wiki_url": item.get("url","#"),
+            })
+    except Exception as e:
+        print(f"Feed wiki error: {e}")
+
+    # Mix: 2 normal posts, 1 wiki post
     all_posts = []
+    wi = 0
     for i, p in enumerate(posts):
         all_posts.append(p)
-        # Har 2 posts ke baad 1 Wikipedia article
-        if (i + 1) % 2 == 0 and wiki_posts:
-            idx = (i // 2) % len(wiki_posts)
-            all_posts.append(wiki_posts[idx])
+        if (i+1) % 2 == 0 and wi < len(wiki_posts):
+            all_posts.append(wiki_posts[wi])
+            wi += 1
     return render_template("index.html", posts=all_posts, page="feed")
 
 @app.route("/articles")
 def articles_page():
-    # Wikipedia se nayi articles bhi mix karo
     wiki_arts = []
     try:
-        for item in wiki_trending()[:4]:
+        for i, item in enumerate(get_wiki_daily()[:4]):
             wiki_arts.append({
-                "id": 9000 + len(wiki_arts),
-                "title": item["title"],
+                "id": 9000+i, "title": item["title"],
                 "excerpt": item["excerpt"],
-                "author": "Wikipedia",
-                "initials": "WP",
+                "author": "Wikipedia", "initials": "WP",
                 "date": datetime.utcnow().strftime("%d %B %Y"),
-                "reads": item.get("views", "0") + " views",
-                "read_time": "5 min",
-                "category": "Wikipedia",
-                "thumbnail": item.get("thumbnail"),
-                "bg": "#0a1a0a",
+                "reads": item.get("views","0")+" views",
+                "read_time": "5 min", "category": "Wikipedia",
+                "thumbnail": item.get("thumbnail"), "bg": "#0a1a0a",
             })
-    except Exception:
-        pass
-    all_articles = articles + wiki_arts
-    return render_template("index.html", articles=all_articles, page="article")
+    except Exception as e:
+        print(f"Articles wiki error: {e}")
+    return render_template("index.html", articles=articles+wiki_arts, page="article")
 
-@app.route("/write", methods=["GET", "POST"])
+@app.route("/write", methods=["GET","POST"])
 def write():
     success, pub_title = False, ""
     if request.method == "POST":
-        title    = request.form.get("title", "").strip()
-        content  = request.form.get("content", "").strip()
-        category = request.form.get("category", "General")
+        title   = request.form.get("title","").strip()
+        content = request.form.get("content","").strip()
+        category= request.form.get("category","General")
         if title and len(content) >= 10:
             articles.insert(0, {
-                "id": len(articles) + 1,
-                "title": title,
-                "excerpt": content[:160] + "..." if len(content) > 160 else content,
+                "id": len(articles)+1, "title": title,
+                "excerpt": content[:160]+"..." if len(content)>160 else content,
                 "author": "Aap (You)", "initials": "AP",
                 "date": datetime.now().strftime("%d %B %Y"),
-                "reads": "0", "read_time": f"{max(1, len(content)//500)} min",
-                "category": category,
-                "thumbnail": None, "bg": "#1a1a2e",
+                "reads": "0", "read_time": f"{max(1,len(content)//500)} min",
+                "category": category, "thumbnail": None, "bg": "#1a1a2e",
             })
             success, pub_title = True, title
     return render_template("index.html", page="write", success=success, pub_title=pub_title)
@@ -335,63 +319,69 @@ def profile():
 
 @app.route("/wiki")
 def wiki():
-    query   = request.args.get("q", "").strip()
+    query   = request.args.get("q","").strip()
     results = wiki_search(query) if query else []
-    trending = wiki_trending()
+    trending = get_wiki_daily()
     return render_template("index.html", page="wiki",
-                           wiki_query=query,
-                           wiki_results=results,
+                           wiki_query=query, wiki_results=results,
                            wiki_trending=trending)
 
 @app.route("/google")
 def google_page():
-    query   = request.args.get("q", "").strip()
+    query   = request.args.get("q","").strip()
     results = wiki_search(query, limit=8) if query else []
     return render_template("google.html", query=query, results=results)
 
-# ─────────────────────────────────────────────
-#  API
-# ─────────────────────────────────────────────
+# ──────────────────────────────────────────────
+#  API endpoints
+# ──────────────────────────────────────────────
 
 @app.route("/api/post", methods=["POST"])
 def api_add_post():
     data    = request.get_json(silent=True) or {}
-    content = data.get("content", "").strip()
-    if not content:
-        return jsonify({"ok": False, "error": "Content required"}), 400
+    content = data.get("content","").strip()
+    photo   = data.get("photo", None)
+    if not content and not photo:
+        return jsonify({"ok":False,"error":"Content or photo required"}), 400
     new_post = {
-        "id": len(posts) + 1,
-        "author": "Aap (You)", "avatar": "😊",
+        "id": len(posts)+1, "author": "Aap (You)", "avatar": "😊",
         "location": "Meerut, UP", "time": "Abhi",
-        "content": content,
-        "likes": 0, "comments": 0, "shares": 0,
-        "thumbnail": None, "img_label": None,
+        "content": content, "likes": 0, "comments": 0, "shares": 0,
+        "thumbnail": photo, "img_label": "Aapki Photo",
     }
     posts.insert(0, new_post)
-    return jsonify({"ok": True, "post": new_post})
+    return jsonify({"ok":True,"post":new_post})
 
 @app.route("/api/like/<int:pid>", methods=["POST"])
 def api_like(pid):
-    post = next((p for p in posts if p["id"] == pid), None)
+    post = next((p for p in posts if p["id"]==pid), None)
     if not post:
-        return jsonify({"ok": False}), 404
+        return jsonify({"ok":False}), 404
     post["likes"] += 1
-    return jsonify({"ok": True, "likes": post["likes"]})
+    return jsonify({"ok":True,"likes":post["likes"]})
+
+@app.route("/api/stocks")
+def api_stocks():
+    """Real-time stock prices"""
+    data = get_stock_prices()
+    return jsonify(data)
 
 @app.route("/api/wiki")
 def api_wiki():
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q","").strip()
     if not q:
         return jsonify([])
     return jsonify(wiki_search(q, limit=6))
 
 @app.route("/api/wiki/trending")
 def api_wiki_trending():
-    return jsonify(wiki_trending())
+    return jsonify(get_wiki_daily())
+
+# ──────────────────────────────────────────────
+#  Run
+# ──────────────────────────────────────────────
+
+port = int(os.environ.get("PORT", 10000))
 
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_ENV") == "development"
-    print(f"\n🚀 Viralix running on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=False)
