@@ -135,3 +135,29 @@ document.querySelectorAll('.cp').forEach(cp => {
     this.classList.add('on');
   });
 });
+
+// ── Live Stock Prices ──────────────────────────────────────────────────────
+async function loadStocks() {
+  try {
+    const res = await fetch('/api/stocks');
+    const data = await res.json();
+    for (const [name, val] of Object.entries(data)) {
+      if (!val) continue;
+      const priceEl = document.getElementById('s-' + name);
+      const chgEl   = document.getElementById('c-' + name);
+      if (priceEl) priceEl.textContent = val.price;
+      if (chgEl) {
+        chgEl.textContent  = val.chg;
+        chgEl.className    = 'stk-c ' + (val.up ? 'up' : 'dn');
+      }
+    }
+  } catch(e) {
+    console.log('Stock fetch error:', e);
+  }
+}
+
+// Load stocks on page load, refresh every 5 minutes
+if (document.getElementById('stocks-box')) {
+  loadStocks();
+  setInterval(loadStocks, 5 * 60 * 1000);
+}
